@@ -1,0 +1,4 @@
+NumPy >= 1.11.1
+Pytorch >= 0.3.0
+nltk
+tensorboardX
