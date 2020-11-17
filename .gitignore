@@ -1,0 +1,6 @@
+TensorFlow-transformer/.idea
+TensorFlow-transformer/__pycache__
+TensorFlow-transformer/*pyc
+pytorch-transformer/*pyc
+pytorch-transformer/__pycache__
+pytorch-transformer/.idea
