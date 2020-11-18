@@ -1,3 +1,3 @@
 # Transformer
-论文地址：
-这个仓库包含两种transformer
+
+Including two kinds of transformer,one use tensorflow,another uses pytorch
