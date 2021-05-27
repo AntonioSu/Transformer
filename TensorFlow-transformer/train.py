@@ -8,60 +8,62 @@ import os, codecs
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+
+
 class Graph():
     def __init__(self, is_training=True):
         self.graph = tf.Graph()
         with self.graph.as_default():
             if is_training:
-                self.x, self.y, self.num_batch = get_batch_data() # (N, T)
-            else: # inference
+                self.x, self.y, self.num_batch = get_batch_data()  # (N, T)
+            else:  # inference
                 self.x = tf.placeholder(tf.int32, shape=(None, hp.maxlen))
                 self.y = tf.placeholder(tf.int32, shape=(None, hp.maxlen))
 
             # define decoder inputs
-            self.decoder_inputs = tf.concat((tf.ones_like(self.y[:, :1])*2, self.y[:, :-1]), -1) # 2:<S>
+            self.decoder_inputs = tf.concat((tf.ones_like(self.y[:, :1]) * 2, self.y[:, :-1]), -1)  # 2:<S>
 
             # Load vocabulary
             en2idx, idx2en = load_en_vocab()
             chi2idx, idx2chi = load_chi_vocab()
 
-
             # Encoder
             with tf.variable_scope("encoder"):
                 ## Embedding
                 self.enc = embedding(self.x,
-                                      vocab_size=len(en2idx),
-                                      num_units=hp.hidden_units,
-                                      scale=True,
-                                      scope="enc_embed")
+                                     vocab_size=len(en2idx),
+                                     num_units=hp.hidden_units,
+                                     scale=True,
+                                     scope="enc_embed")
 
                 ## Positional Encoding
-                self.enc += embedding(tf.tile(tf.expand_dims(tf.range(tf.shape(self.x)[1]), 0), [tf.shape(self.x)[0], 1]),
-                                      vocab_size=hp.maxlen,
-                                      num_units=hp.hidden_units,
-                                      zero_pad=False,
-                                      scale=False,
-                                      scope="enc_pe")
+                self.enc += embedding(
+                    tf.tile(tf.expand_dims(tf.range(tf.shape(self.x)[1]), 0), [tf.shape(self.x)[0], 1]),
+                    vocab_size=hp.maxlen,
+                    num_units=hp.hidden_units,
+                    zero_pad=False,
+                    scale=False,
+                    scope="enc_pe")
 
                 ## Dropout
                 self.enc = tf.layers.dropout(self.enc,
-                                            rate=hp.dropout_rate,
-                                            training=tf.convert_to_tensor(is_training))
+                                             rate=hp.dropout_rate,
+                                             training=tf.convert_to_tensor(is_training))
 
                 ## Blocks
                 for i in range(hp.num_blocks):
                     with tf.variable_scope("num_blocks_{}".format(i)):
                         ### Multihead Attention
                         self.enc = multihead_attention(queries=self.enc,
-                                                        keys=self.enc,
-                                                        num_units=hp.hidden_units,
-                                                        num_heads=hp.num_heads,
-                                                        dropout_rate=hp.dropout_rate,
-                                                        is_training=is_training,
-                                                        causality=False)
+                                                       keys=self.enc,
+                                                       num_units=hp.hidden_units,
+                                                       num_heads=hp.num_heads,
+                                                       dropout_rate=hp.dropout_rate,
+                                                       is_training=is_training,
+                                                       causality=False)
 
                         ### Feed Forward
-                        self.enc = feedforward(self.enc, num_units=[4*hp.hidden_units, hp.hidden_units])
+                        self.enc = feedforward(self.enc, num_units=[4 * hp.hidden_units, hp.hidden_units])
 
             # Decoder
             with tf.variable_scope("decoder"):
@@ -116,7 +118,7 @@ class Graph():
             self.logits = tf.layers.dense(self.dec, len(chi2idx))
             self.preds = tf.to_int32(tf.arg_max(self.logits, dimension=-1))
 
-            #delete the start element <S>
+            # delete the start element <S>
             self.istarget = tf.to_float(tf.not_equal(self.y, 0))
             self.acc = tf.reduce_sum(tf.to_float(tf.equal(self.preds, self.y)) * self.istarget) / (
                 tf.reduce_sum(self.istarget))
@@ -142,34 +144,34 @@ if __name__ == '__main__':
     # Construct graph
     g = Graph()
     print("Graph loaded")
-    #plot the loss
-    num=0
-    all_loss=[]
-    nums=[]
-    res=open('path.txt','w')
+    # plot the loss
+    num = 0
+    all_loss = []
+    nums = []
+    res = open('path.txt', 'w')
 
     # Start session
     sv = tf.train.Supervisor(graph=g.graph,
                              logdir=hp.logdir,
                              save_model_secs=0)
     with sv.managed_session() as sess:
-        for epoch in range(1, hp.num_epochs+1):
+        for epoch in range(1, hp.num_epochs + 1):
             if sv.should_stop():
                 break
             for step in tqdm(range(g.num_batch), total=g.num_batch, ncols=70, leave=False, unit='b'):
                 sess.run(g.train_op)
-                loss=sess.run(g.loss)
+                loss = sess.run(g.loss)
                 num += 1
 
-                loss=np.sum(loss)/320
+                loss = np.sum(loss) / 320
                 all_loss.append(loss)
 
                 nums.append(num)
-                res.write(str(all_loss)+','+str(num))
+                res.write(str(all_loss) + ',' + str(num))
 
             gs = sess.run(g.global_step)
             sv.saver.save(sess, hp.logdir + '/model_epoch_%02d_gs_%d' % (epoch, gs))
-    #plot the loss curse
-    plt.scatter(nums,all_loss,alpha=0.6)
+    # plot the loss curse
+    plt.scatter(nums, all_loss, alpha=0.6)
     plt.savefig('filename.png')
     print("Done")
